@@ -1355,9 +1355,18 @@ foreach(EXT_NAME IN LISTS DUCKDB_EXTENSION_NAMES)
     continue()
   endif()
 
-  # Warning for trying to load vcpkg extensions without having VCPKG_BUILD SET
+ # Warning for trying to load vcpkg extensions without having VCPKG_BUILD SET
+  # Only warn if dependencies are not available via system packages (e.g., pkg-config)
   if (EXISTS "${DUCKDB_EXTENSION_${EXT_NAME_UPPERCASE}_PATH}/vcpkg.json" AND NOT DEFINED VCPKG_BUILD)
-    message(WARNING "Extension '${EXT_NAME}' has a vcpkg.json, but build was not run with VCPKG. If build fails, check out VCPKG build instructions in 'duckdb/extension/README.md' or try manually installing the dependencies in ${DUCKDB_EXTENSION_${EXT_NAME_UPPERCASE}_PATH}vcpkg.json")
+    # Check if OpenSSL is available via pkg-config (common case for httpfs extension)
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
+      pkg_check_modules(OPENSSL_PKG QUIET openssl)
+    endif()
+    # Only warn if OpenSSL is not found via pkg-config
+    if (NOT OPENSSL_PKG_FOUND)
+      message(WARNING "Extension '${EXT_NAME}' has a vcpkg.json, but build was not run with VCPKG. If build fails, check out VCPKG build instructions in 'duckdb/extension/README.md' or try manually installing the dependencies in ${DUCKDB_EXTENSION_${EXT_NAME_UPPERCASE}_PATH}vcpkg.json")
+    endif()
   endif()
 
   if (NOT "${DUCKDB_EXTENSION_${EXT_NAME_UPPERCASE}_EXT_VERSION}" STREQUAL "")

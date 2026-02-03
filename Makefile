@@ -1,4 +1,4 @@
-.PHONY: all opt unit clean debug release test unittest allunit benchmark docs doxygen format sqlite
+.PHONY: all opt unit clean debug release release-clang-libcxx test unittest allunit benchmark docs doxygen format sqlite
 
 all: release
 opt: release
@@ -328,6 +328,12 @@ ifdef DUCKDB_PLATFORM
 	endif
 endif
 
+# Path to libc++ for clang builds
+LIBCXX_PATH ?= ${YB_THIRDPARTY_DIR}/installed/uninstrumented/libcxx/lib/libc++.so.1
+LIBCXX_DIR := $(dir $(LIBCXX_PATH))
+# Path to libunwind (required by libc++)
+LIBUNWIND_DIR ?= ${YB_THIRDPARTY_DIR}/installed/common/lib
+
 clean:
 	rm -rf build
 
@@ -344,6 +350,19 @@ release: ${EXTENSION_CONFIG_STEP}
 	mkdir -p ./build/release && \
 	cd build/release && \
 	cmake $(GENERATOR) $(FORCE_COLOR) ${WARNINGS_AS_ERRORS} ${FORCE_WARN_UNUSED_FLAG} ${FORCE_32_BIT_FLAG} ${DISABLE_UNITY_FLAG} ${DISABLE_SANITIZER_FLAG} ${STATIC_LIBCPP} ${CMAKE_VARS} ${CMAKE_VARS_BUILD} -DCMAKE_BUILD_TYPE=Release ../.. && \
+	cmake --build . --config Release
+
+release-clang-libcxx: ${EXTENSION_CONFIG_STEP}
+	mkdir -p ./build/release-clang-libcxx && \
+	cd build/release-clang-libcxx && \
+	cmake $(GENERATOR) $(FORCE_COLOR) ${WARNINGS_AS_ERRORS} ${FORCE_WARN_UNUSED_FLAG} ${FORCE_32_BIT_FLAG} ${DISABLE_UNITY_FLAG} ${DISABLE_SANITIZER_FLAG} ${CMAKE_VARS} ${CMAKE_VARS_BUILD} \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} \
+		-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} \
+		-DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+		-DCMAKE_SHARED_LINKER_FLAGS="-Wl,-rpath,$(LIBCXX_DIR):$(LIBUNWIND_DIR) -L$(LIBCXX_DIR) -L$(LIBUNWIND_DIR) -lc++ -lunwind" \
+		-DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath,$(LIBCXX_DIR):$(LIBUNWIND_DIR) -L$(LIBCXX_DIR) -L$(LIBUNWIND_DIR) -lc++ -lunwind" \
+		../.. && \
 	cmake --build . --config Release
 
 wasm_mvp: ${EXTENSION_CONFIG_STEP}
